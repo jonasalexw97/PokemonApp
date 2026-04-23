@@ -253,10 +253,67 @@ elif page == "📚 Bibliothek":
     back_to_home()
     st.subheader("📚 Sammlung")
 
-    data = supabase.table("collection").select("*").execute().data
+    # -----------------------------
+    # SORT OPTION
+    # -----------------------------
+    sort_option = st.selectbox(
+        "Sortieren",
+        ["Aktueller Preis ↓", "Aktueller Preis ↑", "Gewinn ↓", "Gewinn ↑"]
+    )
 
-    for row in data:
-        st.write(row)
+    # -----------------------------
+    # DATA LOAD
+    # -----------------------------
+    collection = supabase.table("collection").select("*").execute().data
+    cards = supabase.table("cards").select("*").execute().data
+
+    # Map für schnelle Card-Zuordnung
+    card_map = {c["id"]: c for c in cards}
+
+    # -----------------------------
+    # SORT LOGIC
+    # -----------------------------
+    def profit(x):
+        return x["current_price"] - x["purchase_price"]
+
+    if sort_option == "Aktueller Preis ↓":
+        collection.sort(key=lambda x: x["current_price"], reverse=True)
+
+    elif sort_option == "Aktueller Preis ↑":
+        collection.sort(key=lambda x: x["current_price"])
+
+    elif sort_option == "Gewinn ↓":
+        collection.sort(key=profit, reverse=True)
+
+    elif sort_option == "Gewinn ↑":
+        collection.sort(key=profit)
+
+    # -----------------------------
+    # DISPLAY
+    # -----------------------------
+    for row in collection:
+
+        card = card_map.get(row["card_id"])
+
+        col1, col2, col3 = st.columns([1.5, 4, 1])
+
+        with col1:
+            if card:
+                st.image(card["image_url"], width=120)
+
+        with col2:
+            st.write(card["name"] if card else "Unknown Card")
+            st.write(f"Zustand: {row['condition']}")
+            st.write(f"Variante: {row['variant']}")
+            st.write(f"{row['purchase_price']} € → {row['current_price']} €")
+
+            profit_value = row["current_price"] - row["purchase_price"]
+            st.write("🟢" if profit_value >= 0 else "🔴", round(profit_value, 2))
+
+        with col3:
+            if st.button("🗑️", key=f"del_{row['id']}"):
+                supabase.table("collection").delete().eq("id", row["id"]).execute()
+                st.rerun()
 
 # =========================================================
 # PORTFOLIO
