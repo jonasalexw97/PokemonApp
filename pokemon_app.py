@@ -295,11 +295,11 @@ elif page == "📚 Bibliothek":
 
         card = card_map.get(row["card_id"])
 
-        col1, col2, col3 = st.columns([1.5, 4, 1])
+        col1, col2, col3 = st.columns([2, 5, 1])
 
         with col1:
             if card:
-                st.image(card["image_url"], width=120)
+                st.image(card["image_url"], width=180)
 
         with col2:
             st.write(card["name"] if card else "Unknown Card")
