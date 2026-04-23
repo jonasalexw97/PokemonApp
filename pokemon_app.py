@@ -11,27 +11,6 @@ SUPABASE_KEY = "..."
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================================================
-# CARDS INITIAL LOAD (IMPORTANT FIX)
-# =========================================================
-cards = supabase.table("cards").select("*").execute().data
-
-if len(cards) == 0:
-    import requests
-
-    st.info("Cards werden einmalig geladen...")
-
-    data = requests.get("https://api.pokemontcg.io/v2/cards").json()["data"]
-
-    for c in data:
-        supabase.table("cards").upsert({
-            "id": c["id"],
-            "name": c["name"],
-            "image_url": c["images"]["small"]
-        }).execute()
-
-    st.success("Cards erfolgreich geladen!")
-
-# =========================================================
 # PAGE CONFIG
 # =========================================================
 st.set_page_config(page_title="Pokémon App", layout="wide")
