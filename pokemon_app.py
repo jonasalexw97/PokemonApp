@@ -65,7 +65,7 @@ button:hover {
 st.title("🃏 Pokémon App")
 
 # =========================================================
-# BACK BUTTON
+# BACK
 # =========================================================
 def back_to_home():
     if st.button("⬅️ Zurück zum Menü"):
@@ -120,7 +120,6 @@ if len(rows) == 0:
         cur.execute("INSERT OR IGNORE INTO sets (name) VALUES (?)", (s["name"],))
 
     conn.commit()
-
     cur.execute("SELECT id, name FROM sets")
     rows = cur.fetchall()
 
@@ -141,7 +140,7 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
-# HOME
+# HOME (CLICKABLE BIG CARDS)
 # =========================================================
 if page == "🏠 Home":
 
@@ -150,18 +149,19 @@ if page == "🏠 Home":
 
     col1, col2, col3 = st.columns(3)
 
-    def home_card(icon, title, text, target, key):
+    def card(icon, title, desc, target, key):
         st.markdown(f"""
         <div style="
             background: linear-gradient(135deg,#2b2b3d,#1f1f2e);
-            padding: 45px;
-            border-radius: 20px;
+            padding: 50px;
+            border-radius: 25px;
             text-align: center;
-            box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+            cursor: pointer;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         ">
-            <div style="font-size:55px;">{icon}</div>
+            <div style="font-size:60px;">{icon}</div>
             <h2>{title}</h2>
-            <p style="opacity:0.7;">{text}</p>
+            <p style="opacity:0.7;">{desc}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -170,13 +170,13 @@ if page == "🏠 Home":
             st.rerun()
 
     with col1:
-        home_card("🔍", "Karten suchen", "Karten entdecken", "🔍 Karten suchen", "h1")
+        card("🔍", "Karten suchen", "Pokémon Karten entdecken", "🔍 Karten suchen", "h1")
 
     with col2:
-        home_card("📚", "Bibliothek", "Sammlung verwalten", "📚 Bibliothek", "h2")
+        card("📚", "Bibliothek", "Deine Sammlung", "📚 Bibliothek", "h2")
 
     with col3:
-        home_card("📊", "Portfolio", "Wert ansehen", "📊 Portfolio", "h3")
+        card("📊", "Portfolio", "Dein Kartenwert", "📊 Portfolio", "h3")
 
 # =========================================================
 # SEARCH
@@ -213,6 +213,9 @@ elif page == "🔍 Karten suchen":
 
                 st.markdown("---")
 
+                # =================================================
+                # STEP 1 (FIXED + PLAYED ADDED)
+                # =================================================
                 if st.session_state["step"] == 1:
 
                     condition = st.selectbox(
@@ -269,8 +272,8 @@ elif page == "🔍 Karten suchen":
                             c["id"],
                             st.session_state["purchase_price"],
                             current_price,
-                            st.session_state.get("temp_condition", "Good"),
-                            st.session_state.get("temp_variant", "Normal")
+                            st.session_state["temp_condition"],
+                            st.session_state["temp_variant"]
                         ))
 
                         conn.commit()
@@ -293,7 +296,7 @@ elif page == "📚 Bibliothek":
     st.subheader("📚 Sammlung")
 
     sort_option = st.selectbox(
-        "Sortieren nach",
+        "Sortieren",
         ["Aktueller Preis ↓", "Aktueller Preis ↑", "Kaufpreis ↓", "Kaufpreis ↑"]
     )
 
