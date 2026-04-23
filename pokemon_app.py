@@ -1,6 +1,14 @@
 import streamlit as st
-import sqlite3
 import requests
+from supabase import create_client, Client
+
+# =========================================================
+# SUPABASE CONNECT
+# =========================================================
+SUPABASE_URL = "https://nnfbikdijkzjdcaltluk.supabase.co"
+SUPABASE_KEY = "sb_publishable_nFVFz7-KZj5LfUPFtONjmw_ilxti7Lt"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================================================
 # PAGE CONFIG
@@ -73,58 +81,19 @@ def back_to_home():
         st.rerun()
 
 # =========================================================
-# DB
+# LOAD SETS (SUPABASE)
 # =========================================================
-conn = sqlite3.connect("pokemon.db", check_same_thread=False)
-cur = conn.cursor()
+sets = supabase.table("sets").select("*").execute().data
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS cards (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    image_url TEXT
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS collection (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    card_id TEXT,
-    purchase_price REAL,
-    current_price REAL,
-    condition TEXT,
-    variant TEXT,
-    purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS sets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE
-)
-""")
-
-conn.commit()
-
-# =========================================================
-# LOAD SETS
-# =========================================================
-cur.execute("SELECT id, name FROM sets")
-rows = cur.fetchall()
-
-if len(rows) == 0:
+if not sets:
     data = requests.get("https://api.pokemontcg.io/v2/sets").json()["data"]
 
     for s in data:
-        cur.execute("INSERT OR IGNORE INTO sets (name) VALUES (?)", (s["name"],))
+        supabase.table("sets").insert({"name": s["name"]}).execute()
 
-    conn.commit()
-    cur.execute("SELECT id, name FROM sets")
-    rows = cur.fetchall()
+    sets = supabase.table("sets").select("*").execute().data
 
-set_dict = {name: id for id, name in rows}
-set_options = ["ALL"] + list(set_dict.keys())
+set_options = ["ALL"] + [s["name"] for s in sets]
 
 # =========================================================
 # NAV
@@ -140,12 +109,11 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
-# HOME (CLICKABLE BIG CARDS)
+# HOME
 # =========================================================
 if page == "🏠 Home":
 
     st.markdown("## 👋 Willkommen")
-    st.markdown("### Wähle einen Bereich")
 
     col1, col2, col3 = st.columns(3)
 
@@ -156,12 +124,10 @@ if page == "🏠 Home":
             padding: 50px;
             border-radius: 25px;
             text-align: center;
-            cursor: pointer;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         ">
             <div style="font-size:60px;">{icon}</div>
             <h2>{title}</h2>
-            <p style="opacity:0.7;">{desc}</p>
+            <p>{desc}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -179,7 +145,7 @@ if page == "🏠 Home":
         card("📊", "Portfolio", "Dein Kartenwert", "📊 Portfolio", "h3")
 
 # =========================================================
-# SEARCH
+# SEARCH (SUPABASE SAVE)
 # =========================================================
 elif page == "🔍 Karten suchen":
 
@@ -213,9 +179,6 @@ elif page == "🔍 Karten suchen":
 
                 st.markdown("---")
 
-                # =================================================
-                # STEP 1 (FIXED + PLAYED ADDED)
-                # =================================================
                 if st.session_state["step"] == 1:
 
                     condition = st.selectbox(
@@ -259,24 +222,19 @@ elif page == "🔍 Karten suchen":
 
                     if st.button("Speichern", key=f"s_{c['id']}"):
 
-                        cur.execute("""
-                        INSERT OR IGNORE INTO cards (id, name, image_url)
-                        VALUES (?, ?, ?)
-                        """, (c["id"], c["name"], c["images"]["small"]))
+                        supabase.table("cards").upsert({
+                            "id": c["id"],
+                            "name": c["name"],
+                            "image_url": c["images"]["small"]
+                        }).execute()
 
-                        cur.execute("""
-                        INSERT INTO collection
-                        (card_id, purchase_price, current_price, condition, variant, purchase_date)
-                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        """, (
-                            c["id"],
-                            st.session_state["purchase_price"],
-                            current_price,
-                            st.session_state["temp_condition"],
-                            st.session_state["temp_variant"]
-                        ))
-
-                        conn.commit()
+                        supabase.table("collection").insert({
+                            "card_id": c["id"],
+                            "purchase_price": st.session_state["purchase_price"],
+                            "current_price": current_price,
+                            "condition": st.session_state["temp_condition"],
+                            "variant": st.session_state["temp_variant"]
+                        }).execute()
 
                         st.success("Gespeichert!")
 
@@ -295,56 +253,10 @@ elif page == "📚 Bibliothek":
     back_to_home()
     st.subheader("📚 Sammlung")
 
-    sort_option = st.selectbox(
-        "Sortieren",
-        ["Aktueller Preis ↓", "Aktueller Preis ↑", "Kaufpreis ↓", "Kaufpreis ↑"]
-    )
+    data = supabase.table("collection").select("*").execute().data
 
-    order_sql = {
-        "Aktueller Preis ↓": "current_price DESC",
-        "Aktueller Preis ↑": "current_price ASC",
-        "Kaufpreis ↓": "purchase_price DESC",
-        "Kaufpreis ↑": "purchase_price ASC"
-    }[sort_option]
-
-    cur.execute(f"""
-        SELECT
-            col.id,
-            c.name,
-            c.image_url,
-            col.purchase_price,
-            col.current_price,
-            col.condition,
-            col.variant,
-            (col.current_price - col.purchase_price)
-        FROM collection col
-        JOIN cards c ON col.card_id = c.id
-        ORDER BY {order_sql}
-    """)
-
-    rows = cur.fetchall()
-
-    for col_id, name, img, buy, current, condition, variant, profit in rows:
-
-        col1, col2, col3 = st.columns([1.5, 4, 1])
-
-        with col1:
-            if img:
-                st.image(img, width=170)
-
-        with col2:
-            st.write(name)
-            st.write(condition)
-            st.write(variant)
-            st.write(f"{buy} → {current}")
-            st.write("🟢" if profit >= 0 else "🔴", round(profit, 2))
-
-        with col3:
-            if st.button("🗑️ Löschen", key=f"del_{col_id}"):
-
-                cur.execute("DELETE FROM collection WHERE id=?", (col_id,))
-                conn.commit()
-                st.rerun()
+    for row in data:
+        st.write(row)
 
 # =========================================================
 # PORTFOLIO
@@ -354,16 +266,12 @@ elif page == "📊 Portfolio":
     back_to_home()
     st.subheader("📊 Portfolio")
 
-    cur.execute("""
-        SELECT
-            COUNT(*),
-            COALESCE(SUM(purchase_price),0),
-            COALESCE(SUM(current_price),0),
-            COALESCE(SUM(current_price - purchase_price),0)
-        FROM collection
-    """)
+    data = supabase.table("collection").select("*").execute().data
 
-    count, invested, value, profit = cur.fetchone()
+    count = len(data)
+    invested = sum(x["purchase_price"] for x in data)
+    value = sum(x["current_price"] for x in data)
+    profit = value - invested
 
     st.metric("Karten", count)
     st.metric("Investiert", f"{invested:.2f} €")
