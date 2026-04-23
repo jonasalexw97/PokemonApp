@@ -1,5 +1,5 @@
 import streamlit as st
-import psycopg2
+import sqlite3
 import requests
 
 # =========================================================
@@ -19,7 +19,6 @@ if "init" not in st.session_state:
         "set_cards": [],
     })
     st.session_state["init"] = True
-
 
 # =========================================================
 # API
@@ -44,7 +43,6 @@ def get_cards(search=None, set_name=None):
     except:
         return []
 
-
 # =========================================================
 # STYLE
 # =========================================================
@@ -66,29 +64,68 @@ button:hover {
 
 st.title("🃏 Pokémon App")
 
-
+# =========================================================
+# BACK BUTTON
+# =========================================================
 def back_to_home():
     if st.button("⬅️ Zurück zum Menü"):
         st.session_state["page"] = "🏠 Home"
         st.rerun()
 
-
 # =========================================================
 # DB
 # =========================================================
-conn = psycopg2.connect(
-    dbname="pokemon_db",
-    user="postgres",
-    password="1234",
-    host="localhost",
-    port="5434"
-)
+conn = sqlite3.connect("pokemon.db", check_same_thread=False)
 cur = conn.cursor()
 
-cur.execute("SELECT id, name FROM sets")
-set_dict = {name: id for id, name in cur.fetchall()}
-set_options = ["ALL"] + list(set_dict.keys())
+cur.execute("""
+CREATE TABLE IF NOT EXISTS cards (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    image_url TEXT
+)
+""")
 
+cur.execute("""
+CREATE TABLE IF NOT EXISTS collection (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id TEXT,
+    purchase_price REAL,
+    current_price REAL,
+    condition TEXT,
+    variant TEXT,
+    purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE
+)
+""")
+
+conn.commit()
+
+# =========================================================
+# LOAD SETS
+# =========================================================
+cur.execute("SELECT id, name FROM sets")
+rows = cur.fetchall()
+
+if len(rows) == 0:
+    data = requests.get("https://api.pokemontcg.io/v2/sets").json()["data"]
+
+    for s in data:
+        cur.execute("INSERT OR IGNORE INTO sets (name) VALUES (?)", (s["name"],))
+
+    conn.commit()
+
+    cur.execute("SELECT id, name FROM sets")
+    rows = cur.fetchall()
+
+set_dict = {name: id for id, name in rows}
+set_options = ["ALL"] + list(set_dict.keys())
 
 # =========================================================
 # NAV
@@ -104,81 +141,43 @@ with st.sidebar:
 page = st.session_state["page"]
 
 # =========================================================
-# HOME (verbessertes Layout)
+# HOME
 # =========================================================
 if page == "🏠 Home":
-    st.markdown("## 👋 Willkommen")
 
+    st.markdown("## 👋 Willkommen")
     st.markdown("### Wähle einen Bereich")
 
     col1, col2, col3 = st.columns(3)
 
-    # ---------------- CARD 1 ----------------
+    def home_card(icon, title, text, target, key):
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg,#2b2b3d,#1f1f2e);
+            padding: 45px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+        ">
+            <div style="font-size:55px;">{icon}</div>
+            <h2>{title}</h2>
+            <p style="opacity:0.7;">{text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("Öffnen", key=key):
+            st.session_state["page"] = target
+            st.rerun()
+
     with col1:
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg,#2b2b3d,#1f1f2e);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            cursor: pointer;
-            box-shadow: 0px 4px 20px rgba(0,0,0,0.4);
-        ">
-            <div style="font-size:50px;">🔍</div>
-            <h2>Karten suchen</h2>
-            <p style="opacity:0.7;">Pokémon Karten entdecken</p>
-        </div>
-        """, unsafe_allow_html=True)
+        home_card("🔍", "Karten suchen", "Karten entdecken", "🔍 Karten suchen", "h1")
 
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-        if st.button("▶ Öffnen", key="home_search"):
-            st.session_state["page"] = "🔍 Karten suchen"
-            st.rerun()
-
-    # ---------------- CARD 2 ----------------
     with col2:
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg,#2b2b3d,#1f1f2e);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0px 4px 20px rgba(0,0,0,0.4);
-        ">
-            <div style="font-size:50px;">📚</div>
-            <h2>Bibliothek</h2>
-            <p style="opacity:0.7;">Deine Sammlung verwalten</p>
-        </div>
-        """, unsafe_allow_html=True)
+        home_card("📚", "Bibliothek", "Sammlung verwalten", "📚 Bibliothek", "h2")
 
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-        if st.button("▶ Öffnen", key="home_library"):
-            st.session_state["page"] = "📚 Bibliothek"
-            st.rerun()
-
-    # ---------------- CARD 3 ----------------
     with col3:
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg,#2b2b3d,#1f1f2e);
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0px 4px 20px rgba(0,0,0,0.4);
-        ">
-            <div style="font-size:50px;">📊</div>
-            <h2>Portfolio</h2>
-            <p style="opacity:0.7;">Wert deiner Karten</p>
-        </div>
-        """, unsafe_allow_html=True)
+        home_card("📊", "Portfolio", "Wert ansehen", "📊 Portfolio", "h3")
 
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-        if st.button("▶ Öffnen", key="home_portfolio"):
-            st.session_state["page"] = "📊 Portfolio"
-            st.rerun()
 # =========================================================
 # SEARCH
 # =========================================================
@@ -210,13 +209,10 @@ elif page == "🔍 Karten suchen":
 
             selected = st.session_state.get("selected_card")
 
-            if selected and selected.get("id") == c["id"]:
+            if selected and selected["id"] == c["id"]:
 
                 st.markdown("---")
 
-                # =================================================
-                # STEP 1: ZUSTAND + VARIANTE
-                # =================================================
                 if st.session_state["step"] == 1:
 
                     condition = st.selectbox(
@@ -232,27 +228,12 @@ elif page == "🔍 Karten suchen":
                         key=f"var_{c['id']}"
                     )
 
-                    st.markdown(f"""
-                    <div style="
-                        padding:10px;
-                        border-radius:10px;
-                        background:#1f1f2e;
-                        margin-top:10px;
-                        text-align:center;
-                    ">
-                        Zustand: <b>{condition}</b> | Variante: <b>{variant}</b>
-                    </div>
-                    """, unsafe_allow_html=True)
-
                     if st.button("Weiter", key=f"n1_{c['id']}"):
                         st.session_state["temp_condition"] = condition
                         st.session_state["temp_variant"] = variant
                         st.session_state["step"] = 2
                         st.rerun()
 
-                # =================================================
-                # STEP 2: KAUFPREIS
-                # =================================================
                 elif st.session_state["step"] == 2:
 
                     st.session_state["purchase_price"] = st.number_input(
@@ -265,9 +246,6 @@ elif page == "🔍 Karten suchen":
                         st.session_state["step"] = 3
                         st.rerun()
 
-                # =================================================
-                # STEP 3: AKTUELLER PREIS + SPEICHERN
-                # =================================================
                 elif st.session_state["step"] == 3:
 
                     current_price = st.number_input(
@@ -278,22 +256,15 @@ elif page == "🔍 Karten suchen":
 
                     if st.button("Speichern", key=f"s_{c['id']}"):
 
-                        # Card sichern
                         cur.execute("""
-                            INSERT INTO cards (id, name, image_url)
-                            VALUES (%s, %s, %s)
-                            ON CONFLICT (id) DO NOTHING
-                        """, (
-                            c["id"],
-                            c["name"],
-                            c["images"]["small"]
-                        ))
+                        INSERT OR IGNORE INTO cards (id, name, image_url)
+                        VALUES (?, ?, ?)
+                        """, (c["id"], c["name"], c["images"]["small"]))
 
-                        # Collection speichern
                         cur.execute("""
-                            INSERT INTO collection 
-                            (card_id, purchase_price, current_price, condition, variant, purchase_date)
-                            VALUES (%s,%s,%s,%s,%s,NOW())
+                        INSERT INTO collection
+                        (card_id, purchase_price, current_price, condition, variant, purchase_date)
+                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                         """, (
                             c["id"],
                             st.session_state["purchase_price"],
@@ -327,14 +298,14 @@ elif page == "📚 Bibliothek":
     )
 
     order_sql = {
-        "Aktueller Preis ↓": "col.current_price DESC",
-        "Aktueller Preis ↑": "col.current_price ASC",
-        "Kaufpreis ↓": "col.purchase_price DESC",
-        "Kaufpreis ↑": "col.purchase_price ASC"
+        "Aktueller Preis ↓": "current_price DESC",
+        "Aktueller Preis ↑": "current_price ASC",
+        "Kaufpreis ↓": "purchase_price DESC",
+        "Kaufpreis ↑": "purchase_price ASC"
     }[sort_option]
 
     cur.execute(f"""
-        SELECT 
+        SELECT
             col.id,
             c.name,
             c.image_url,
@@ -342,7 +313,7 @@ elif page == "📚 Bibliothek":
             col.current_price,
             col.condition,
             col.variant,
-            (col.current_price - col.purchase_price) AS profit
+            (col.current_price - col.purchase_price)
         FROM collection col
         JOIN cards c ON col.card_id = c.id
         ORDER BY {order_sql}
@@ -359,20 +330,18 @@ elif page == "📚 Bibliothek":
                 st.image(img, width=170)
 
         with col2:
-            st.write(f"**{name}**")
-            st.write(f"Zustand: {condition}")
-            st.write(f"Variante: {variant}")
-            st.write(f"Kaufpreis: {buy} €")
-            st.write(f"Aktueller Preis: {current} €")
-            st.write(("🟢 Gewinn: " if profit >= 0 else "🔴 Verlust: "), round(profit, 2))
+            st.write(name)
+            st.write(condition)
+            st.write(variant)
+            st.write(f"{buy} → {current}")
+            st.write("🟢" if profit >= 0 else "🔴", round(profit, 2))
 
         with col3:
             if st.button("🗑️ Löschen", key=f"del_{col_id}"):
 
-                cur.execute("DELETE FROM collection WHERE id=%s", (col_id,))
+                cur.execute("DELETE FROM collection WHERE id=?", (col_id,))
                 conn.commit()
                 st.rerun()
-
 
 # =========================================================
 # PORTFOLIO
@@ -383,7 +352,7 @@ elif page == "📊 Portfolio":
     st.subheader("📊 Portfolio")
 
     cur.execute("""
-        SELECT 
+        SELECT
             COUNT(*),
             COALESCE(SUM(purchase_price),0),
             COALESCE(SUM(current_price),0),
@@ -393,10 +362,7 @@ elif page == "📊 Portfolio":
 
     count, invested, value, profit = cur.fetchone()
 
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("Karten", count)
-    c2.metric("Investiert", f"{invested:.2f} €")
-    c3.metric("Wert", f"{value:.2f} €")
-
+    st.metric("Karten", count)
+    st.metric("Investiert", f"{invested:.2f} €")
+    st.metric("Wert", f"{value:.2f} €")
     st.metric("Gewinn", f"{profit:.2f} €")
