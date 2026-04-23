@@ -9,7 +9,8 @@ SUPABASE_URL = "https://nnfbikdijkzjdcaltluk.supabase.co"
 SUPABASE_KEY = "..."
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+st.write("SETS TEST:")
+st.write(supabase.table("sets").select("*").limit(5).execute().data)
 # =========================================================
 # PAGE CONFIG
 # =========================================================
