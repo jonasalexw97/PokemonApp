@@ -56,17 +56,61 @@ def get_cards(search=None, set_name=None):
 # =========================================================
 st.markdown("""
 <style>
+
+/* APP BACKGROUND */
 .stApp {
     background: linear-gradient(135deg, #0e0e10, #1a1a1f);
-    color: white;
+    color: white !important;
 }
+
+/* MAIN CONTAINER */
 .block-container {
     padding-top: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
 }
-button:hover {
+
+/* HEADINGS */
+h1, h2, h3, h4, h5, p {
+    color: white !important;
+}
+
+/* BUTTONS (IMPORTANT FIX FOR IPHONE) */
+.stButton > button {
+    background-color: #2b2b3d !important;
+    color: white !important;
+    border: 1px solid #444 !important;
+    border-radius: 12px !important;
+    padding: 0.6em 1em !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    width: 100%;
+}
+
+/* BUTTON HOVER */
+.stButton > button:hover {
+    background-color: #3a3a55 !important;
+    color: white !important;
     transform: scale(1.02);
-    transition: 0.2s;
+    transition: 0.2s ease;
 }
+
+/* INPUT FIELDS */
+input, textarea, .stSelectbox, .stNumberInput {
+    color: white !important;
+    background-color: #1a1a1f !important;
+}
+
+/* FIX LABELS (VERY IMPORTANT ON MOBILE) */
+label {
+    color: white !important;
+}
+
+/* CARD CAPTIONS */
+.stCaption {
+    color: #bbbbbb !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
