@@ -6,9 +6,30 @@ from supabase import create_client, Client
 # SUPABASE CONNECT
 # =========================================================
 SUPABASE_URL = "https://nnfbikdijkzjdcaltluk.supabase.co"
-SUPABASE_KEY = "sb_publishable_nFVFz7-KZj5LfUPFtONjmw_ilxti7Lt"
+SUPABASE_KEY = "..."
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# =========================================================
+# CARDS INITIAL LOAD (IMPORTANT FIX)
+# =========================================================
+cards = supabase.table("cards").select("*").execute().data
+
+if len(cards) == 0:
+    import requests
+
+    st.info("Cards werden einmalig geladen...")
+
+    data = requests.get("https://api.pokemontcg.io/v2/cards").json()["data"]
+
+    for c in data:
+        supabase.table("cards").upsert({
+            "id": c["id"],
+            "name": c["name"],
+            "image_url": c["images"]["small"]
+        }).execute()
+
+    st.success("Cards erfolgreich geladen!")
 
 # =========================================================
 # PAGE CONFIG
