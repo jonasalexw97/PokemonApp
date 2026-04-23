@@ -6,7 +6,7 @@ from supabase import create_client, Client
 # SUPABASE CONNECT
 # =========================================================
 SUPABASE_URL = "https://nnfbikdijkzjdcaltluk.supabase.co"
-SUPABASE_KEY = "..."
+SUPABASE_KEY = "sb_publishable_nFVFz7-KZj5LfUPFtONjmw_ilxti7Lt"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
